@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(uuid())
+  telegramId  BigInt    @unique
+  username    String?
+  firstName   String?
+  lastName    String?
+  isBlocked   Boolean   @default(false)
+  isAdmin     Boolean   @default(false)
+  language    String    @default("fa")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  accounts    SupabaseAccount[]
+  sessions    Session[]
+  auditLogs   AuditLog[]
+
+  @@index([telegramId])
+}
+
+model SupabaseAccount {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label           String
+  encryptedToken  String   // AES-256-GCM encrypted Personal Access Token
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Lightweight per-user conversational state machine (wizards like "create project")
+model Session {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  step        String?
+  context     Json?    // arbitrary wizard payload (project name, org, region, etc.)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  metadata   Json?
+  isError    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Broadcast {
+  id         String   @id @default(uuid())
+  content    String
+  sentBy     String
+  totalSent  Int      @default(0)
+  totalFailed Int     @default(0)
+  createdAt  DateTime @default(now())
+}
